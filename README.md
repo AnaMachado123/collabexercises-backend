@@ -19,11 +19,8 @@ CORS
 Nodemon (ambiente de desenvolvimento)
 
 Instalação e Execução
-1. Instalar dependências
-npm install
+1. Instalar dependências - npm install
 
-2. Executar em ambiente de desenvolvimento
-npm run dev
+2. Executar em ambiente de desenvolvimento - npm run dev
 
-3. Executar em ambiente de produção
-npm start
+3. Executar em ambiente de produção - npm start
