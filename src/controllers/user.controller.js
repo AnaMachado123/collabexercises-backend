@@ -27,11 +27,19 @@ export const updatePassword = async (req, res) => {
     return res.status(400).json({ message: "Current password incorrect" });
   }
 
+  const passwordPolicy = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
+  if (!passwordPolicy.test(newPassword)) {
+    return res.status(400).json({
+      message: "New password must be 8+ characters and include at least 1 letter and 1 number.",
+    });
+  }
+
   user.password = await bcrypt.hash(newPassword, 10);
   await user.save();
 
   res.json({ message: "Password updated successfully" });
 };
+
 
 export const deleteMe = async (req, res) => {
   await User.findByIdAndDelete(req.user._id);
