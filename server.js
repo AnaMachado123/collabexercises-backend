@@ -1,8 +1,7 @@
-import mongoose from "mongoose";
-import dotenv from "dotenv";
-import app from "./src/app.js";
+import "./src/config/env.js"; // 👈 PRIMEIRO
 
-dotenv.config();
+import mongoose from "mongoose";
+import app from "./src/app.js";
 
 mongoose
   .connect(process.env.MONGO_URI)
