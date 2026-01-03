@@ -2,13 +2,14 @@ import mongoose from "mongoose";
 
 const AttachmentSchema = new mongoose.Schema(
   {
-    filename: String,
+    url: { type: String, required: true },       // 🔑 link público
+    publicId: { type: String, required: true }, // 🔑 cloudinary id
     originalName: String,
-    path: String,
     mimetype: String,
   },
   { _id: false }
 );
+
 
 const ExerciseSchema = new mongoose.Schema(
   {

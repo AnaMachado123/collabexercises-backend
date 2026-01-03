@@ -1,6 +1,6 @@
 import express from "express";
 import { protect } from "../middlewares/auth.middleware.js";
-import { upload } from "../middlewares/upload.middleware.js";
+import upload from "../middlewares/upload.middleware.js";
 import {
   createExercise,
   getExercises,
@@ -11,6 +11,7 @@ const router = express.Router();
 
 router.get("/", getExercises);
 router.get("/:id", getExerciseById);
-router.post("/", protect, upload.array("files"), createExercise);
+
+router.post("/", protect, upload.single("files"), createExercise);
 
 export default router;

@@ -1,5 +1,4 @@
 import Exercise from "../models/Exercise.js";
-import cloudinary from "../config/cloudinary.js";
 
 /**
  * POST /api/exercises  (🔒 protegido)
@@ -9,32 +8,29 @@ export const createExercise = async (req, res) => {
   try {
     const { title, description, subject, difficulty } = req.body;
 
+    // Campos obrigatórios
     if (!title || !description || !subject || !difficulty) {
       return res.status(400).json({
         message: "Title, description, subject and difficulty are required",
       });
     }
 
-    let attachments = [];
-
-    if (req.files && req.files.length > 0) {
-      for (const file of req.files) {
-        const uploadResult = await cloudinary.uploader.upload(
-          `data:${file.mimetype};base64,${file.buffer.toString("base64")}`,
-          {
-            folder: "collabexercises",
-            resource_type: "auto",
-          }
-        );
-
-        attachments.push({
-          url: uploadResult.secure_url,
-          publicId: uploadResult.public_id,
-          originalName: file.originalname,
-          mimetype: file.mimetype,
-        });
-      }
+    // 🚫 BLOQUEIO: não criar exercício sem ficheiro
+    if (!req.file) {
+      return res.status(400).json({
+        message: "File upload is required",
+      });
     }
+
+    // 📎 Ficheiro vindo do Cloudinary
+    const attachments = [
+      {
+        url: req.file.path,
+        publicId: req.file.filename,
+        originalName: req.file.originalname,
+        mimetype: req.file.mimetype,
+      },
+    ];
 
     const exercise = await Exercise.create({
       title,
@@ -48,7 +44,11 @@ export const createExercise = async (req, res) => {
     return res.status(201).json(exercise);
   } catch (error) {
     console.error("CREATE EXERCISE ERROR:", error);
-    return res.status(500).json({ message: "Failed to create exercise" });
+
+    // ✅ RESPOSTA CORRETA (nunca devolve objeto bruto)
+    return res.status(500).json({
+      message: error.message || "Failed to create exercise",
+    });
   }
 };
 
@@ -84,7 +84,10 @@ export const getExercises = async (req, res) => {
     return res.status(200).json(exercises);
   } catch (error) {
     console.error("GET EXERCISES ERROR:", error);
-    return res.status(500).json({ message: "Failed to fetch exercises" });
+
+    return res.status(500).json({
+      message: error.message || "Failed to fetch exercises",
+    });
   }
 };
 
@@ -100,12 +103,17 @@ export const getExerciseById = async (req, res) => {
     );
 
     if (!exercise) {
-      return res.status(404).json({ message: "Exercise not found" });
+      return res.status(404).json({
+        message: "Exercise not found",
+      });
     }
 
     return res.status(200).json(exercise);
   } catch (error) {
     console.error("GET EXERCISE BY ID ERROR:", error);
-    return res.status(500).json({ message: "Failed to fetch exercise" });
+
+    return res.status(500).json({
+      message: error.message || "Failed to fetch exercise",
+    });
   }
 };

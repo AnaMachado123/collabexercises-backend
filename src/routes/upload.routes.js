@@ -1,5 +1,5 @@
 import express from "express";
-import { upload } from "../middlewares/upload.middleware.js";
+import upload from "../middlewares/upload.middleware.js";
 import cloudinary from "../config/cloudinary.js";
 
 const router = express.Router();
