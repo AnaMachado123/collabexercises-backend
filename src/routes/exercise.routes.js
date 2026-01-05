@@ -12,7 +12,9 @@ import {
   getExerciseComments,
   createExerciseComment,
   getExerciseSolutions,
+  updateExercise,
   createExerciseSolution,
+  deleteExercise,
 } from "../controllers/exercise.controller.js";
 
 // 🔐 auth → named export
@@ -24,10 +26,12 @@ import uploadMiddleware from "../middlewares/upload.middleware.js";
 /* =========================
    EXERCISES
    ========================= */
-router.post("/", protect, uploadMiddleware.single("file"), createExercise);
+router.post("/", protect, uploadMiddleware.array("files", 10), createExercise);
 router.get("/", getExercises);
 router.get("/saved", protect, getMySavedExercises);
 router.get("/mine", protect, getMyExercises);
+router.put("/:id", protect, uploadMiddleware.array("files", 10), updateExercise);
+router.delete("/:id", protect, deleteExercise);
 router.get("/:id", getExerciseById);
 
 

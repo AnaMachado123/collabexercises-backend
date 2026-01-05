@@ -34,23 +34,16 @@ export const createExercise = async (req, res) => {
       });
     }
 
-    // 🚫 BLOQUEIO: não criar exercício sem ficheiro
-    if (!req.file) {
+   // 🚫 BLOQUEIO: não criar exercício sem ficheiros
+    if (!req.files || req.files.length === 0) {
       return res.status(400).json({
         message: "File upload is required",
       });
     }
 
-    // 📎 Ficheiro vindo do Cloudinary
-    const attachments = [
-      {
-        url: req.file.path,
-        publicId: req.file.filename,
-        originalName: req.file.originalname,
-        mimetype: req.file.mimetype,
-        size: req.file.size,
-      },
-    ];
+    // 📎 Ficheiros vindos do Cloudinary
+    const attachments = mapAttachmentsFromFiles(req.files);
+
 
     const exercise = await Exercise.create({
       title,
@@ -377,6 +370,95 @@ export const getMySavedExercises = async (req, res) => {
     return res.status(500).json({ message: "Erro ao buscar guardados" });
   }
 };
+/**
+ * PUT /api/exercises/:id (🔒)
+ * Editar exercício (só criador)
+ * - pode atualizar title/description/subject/difficulty
+ * - file é opcional (se vier, substitui o attachment)
+ */
+export const updateExercise = async (req, res) => {
+  try {
+    const userId = getUserId(req);
+    const { id } = req.params;
+
+    const exercise = await Exercise.findById(id);
+    if (!exercise) return res.status(404).json({ message: "Exercise not found" });
+
+    // 🔒 só o criador pode editar
+    if (exercise.createdBy.toString() !== userId.toString()) {
+      return res.status(403).json({ message: "Not allowed" });
+    }
+
+    const { title, description, subject, difficulty } = req.body;
+
+    if (title !== undefined) exercise.title = title;
+    if (description !== undefined) exercise.description = description;
+    if (subject !== undefined) exercise.subject = subject;
+    if (difficulty !== undefined) exercise.difficulty = difficulty;
+
+    // ✅ se vierem novos ficheiros, substitui attachments
+    if (req.files && req.files.length > 0) {
+      exercise.attachments = mapAttachmentsFromFiles(req.files);
+    }
+
+
+    await exercise.save();
+
+    // devolver também os counts (para manter UI consistente)
+    const [savesCount, commentsCount, solutionsCount] = await Promise.all([
+      SavedExercise.countDocuments({ exercise: exercise._id }),
+      Comment.countDocuments({ exercise: exercise._id }),
+      Solution.countDocuments({ exercise: exercise._id }),
+    ]);
+
+    return res.json({
+      ...exercise.toObject(),
+      savesCount,
+      commentsCount,
+      solutionsCount,
+    });
+  } catch (err) {
+    console.error("UPDATE EXERCISE ERROR:", err);
+    return res.status(500).json({ message: "Failed to update exercise" });
+  }
+};
+
+/**
+ * DELETE /api/exercises/:id (🔒)
+ * Apagar exercício (só criador)
+ * - apaga também saves/comments/solutions para não ficarem órfãos
+ */
+export const deleteExercise = async (req, res) => {
+  try {
+    const userId = getUserId(req);
+    const { id } = req.params;
+
+    const exercise = await Exercise.findById(id);
+    if (!exercise) return res.status(404).json({ message: "Exercise not found" });
+
+    //  só o criador pode apagar
+    if (exercise.createdBy.toString() !== userId.toString()) {
+      return res.status(403).json({ message: "Not allowed" });
+    }
+
+    //  limpar dependências
+    await Promise.all([
+      SavedExercise.deleteMany({ exercise: id }),
+      Comment.deleteMany({ exercise: id }),
+      Solution.deleteMany({ exercise: id }),
+    ]);
+
+    // apagar o exercício
+    await exercise.deleteOne();
+
+    return res.json({ message: "Exercise deleted" });
+  } catch (err) {
+    console.error("DELETE EXERCISE ERROR:", err);
+    return res.status(500).json({ message: "Failed to delete exercise" });
+  }
+};
+
+
 
 
 
