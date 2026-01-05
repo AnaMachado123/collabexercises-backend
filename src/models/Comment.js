@@ -1,24 +1,21 @@
 import mongoose from "mongoose";
 
-const solutionSchema = new mongoose.Schema(
+const commentSchema = new mongoose.Schema(
   {
     exercise: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Exercise",
       required: true,
     },
-
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
     },
-
     text: {
       type: String,
       default: "",
     },
-
     attachments: [
       {
         url: String,
@@ -32,4 +29,4 @@ const solutionSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-export default mongoose.model("Solution", solutionSchema);
+export default mongoose.model("Comment", commentSchema);
