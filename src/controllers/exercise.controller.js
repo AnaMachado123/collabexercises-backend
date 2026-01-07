@@ -4,6 +4,8 @@ import Exercise from "../models/Exercise.js";
 import SavedExercise from "../models/SavedExercise.js";
 import Comment from "../models/Comment.js";
 import Solution from "../models/Solution.js";
+import Activity from "../models/Activity.js";
+
 
 /* =========================
    Helpers
@@ -43,7 +45,6 @@ export const createExercise = async (req, res) => {
       });
     }
 
-    // ✅ AGORA: ficheiros são OPCIONAIS
     const attachments = mapAttachmentsFromFiles(req.files || []);
 
     const exercise = await Exercise.create({
@@ -51,11 +52,35 @@ export const createExercise = async (req, res) => {
       description: description.trim(),
       subject: subject.trim(),
       difficulty: difficulty.trim(),
-      attachments, // pode ser []
+      attachments,
       createdBy: userId,
     });
 
     await exercise.populate("createdBy", "name email");
+
+    /* =====================================================
+       👉 A PARTIR DAQUI É O QUE TENS DE ADICIONAR
+       ===================================================== */
+
+    // 1️⃣ Criar atividade na BD
+    const activity = await Activity.create({
+      type: "exercise_created",
+      actor: userId,
+      exercise: exercise._id,
+      message: `criou um exercício`,
+    });
+
+    // 2️⃣ Emitir em tempo real (Socket.IO)
+    const io = req.app.get("io");
+    if (io) {
+      const populatedActivity = await Activity.findById(activity._id)
+        .populate("actor", "name email")
+        .populate("exercise", "title subject difficulty createdAt");
+
+      io.emit("activity:new", populatedActivity);
+    }
+
+    /* ===================================================== */
 
     return res.status(201).json({
       ...exercise.toObject(),
@@ -70,6 +95,7 @@ export const createExercise = async (req, res) => {
     });
   }
 };
+
 
 /**
  * GET /api/exercises
