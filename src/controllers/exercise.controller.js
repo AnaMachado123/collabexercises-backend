@@ -1,13 +1,16 @@
 // src/controllers/exercise.controller.js
+import mongoose from "mongoose";
 import Exercise from "../models/Exercise.js";
 import SavedExercise from "../models/SavedExercise.js";
 import Comment from "../models/Comment.js";
 import Solution from "../models/Solution.js";
 
-/**
- * Helpers
- */
+/* =========================
+   Helpers
+   ========================= */
 const getUserId = (req) => req.user?._id || req.user?.id;
+
+const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
 const mapAttachmentsFromFiles = (files = []) => {
   return files.map((f) => ({
@@ -19,42 +22,47 @@ const mapAttachmentsFromFiles = (files = []) => {
   }));
 };
 
+/* =========================
+   EXERCISES
+   ========================= */
+
 /**
- * POST /api/exercises  (🔒 protegido)
- * Criar novo exercício + upload para Cloudinary
+ * POST /api/exercises (🔒)
+ * Criar novo exercício (ficheiros opcionais)
  */
 export const createExercise = async (req, res) => {
   try {
+    const userId = getUserId(req);
     const { title, description, subject, difficulty } = req.body;
 
-    // Campos obrigatórios
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
     if (!title || !description || !subject || !difficulty) {
       return res.status(400).json({
         message: "Title, description, subject and difficulty are required",
       });
     }
 
-   // 🚫 BLOQUEIO: não criar exercício sem ficheiros
-    if (!req.files || req.files.length === 0) {
-      return res.status(400).json({
-        message: "File upload is required",
-      });
-    }
-
-    // 📎 Ficheiros vindos do Cloudinary
-    const attachments = mapAttachmentsFromFiles(req.files);
-
+    // ✅ AGORA: ficheiros são OPCIONAIS
+    const attachments = mapAttachmentsFromFiles(req.files || []);
 
     const exercise = await Exercise.create({
-      title,
-      description,
-      subject,
-      difficulty,
-      attachments,
-      createdBy: getUserId(req),
+      title: title.trim(),
+      description: description.trim(),
+      subject: subject.trim(),
+      difficulty: difficulty.trim(),
+      attachments, // pode ser []
+      createdBy: userId,
     });
 
-    return res.status(201).json(exercise);
+    await exercise.populate("createdBy", "name email");
+
+    return res.status(201).json({
+      ...exercise.toObject(),
+      savesCount: 0,
+      commentsCount: 0,
+      solutionsCount: 0,
+    });
   } catch (error) {
     console.error("CREATE EXERCISE ERROR:", error);
     return res.status(500).json({
@@ -92,7 +100,6 @@ export const getExercises = async (req, res) => {
       .populate("createdBy", "name email")
       .sort({ createdAt: -1 });
 
-    // counts reais (simples e funcional; depois podem otimizar com aggregation)
     const exercisesWithCounts = await Promise.all(
       exercises.map(async (ex) => {
         const [savesCount, commentsCount, solutionsCount] = await Promise.all([
@@ -125,15 +132,19 @@ export const getExercises = async (req, res) => {
  */
 export const getExerciseById = async (req, res) => {
   try {
-    const exercise = await Exercise.findById(req.params.id).populate(
+    const { id } = req.params;
+
+    if (!isValidObjectId(id)) {
+      return res.status(400).json({ message: "Invalid exercise id" });
+    }
+
+    const exercise = await Exercise.findById(id).populate(
       "createdBy",
       "name email"
     );
 
     if (!exercise) {
-      return res.status(404).json({
-        message: "Exercise not found",
-      });
+      return res.status(404).json({ message: "Exercise not found" });
     }
 
     const [savesCount, commentsCount, solutionsCount] = await Promise.all([
@@ -169,6 +180,11 @@ export const toggleSaveExercise = async (req, res) => {
   const { id: exerciseId } = req.params;
 
   try {
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    if (!isValidObjectId(exerciseId)) {
+      return res.status(400).json({ message: "Invalid exercise id" });
+    }
+
     const existing = await SavedExercise.findOne({
       user: userId,
       exercise: exerciseId,
@@ -203,6 +219,11 @@ export const isExerciseSaved = async (req, res) => {
   const { id: exerciseId } = req.params;
 
   try {
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    if (!isValidObjectId(exerciseId)) {
+      return res.status(400).json({ message: "Invalid exercise id" });
+    }
+
     const saved = await SavedExercise.exists({
       user: userId,
       exercise: exerciseId,
@@ -227,6 +248,10 @@ export const getExerciseComments = async (req, res) => {
   const { id: exerciseId } = req.params;
 
   try {
+    if (!isValidObjectId(exerciseId)) {
+      return res.status(400).json({ message: "Invalid exercise id" });
+    }
+
     const comments = await Comment.find({ exercise: exerciseId })
       .populate("user", "name")
       .sort({ createdAt: -1 });
@@ -240,7 +265,7 @@ export const getExerciseComments = async (req, res) => {
 
 /**
  * POST /api/exercises/:id/comments (🔒)
- * Criar comentário (texto + files[])
+ * Criar comentário (texto e/ou files[])
  * - Requer pelo menos text OU files
  */
 export const createExerciseComment = async (req, res) => {
@@ -249,6 +274,11 @@ export const createExerciseComment = async (req, res) => {
   const { text } = req.body;
 
   try {
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    if (!isValidObjectId(exerciseId)) {
+      return res.status(400).json({ message: "Invalid exercise id" });
+    }
+
     const attachments = mapAttachmentsFromFiles(req.files || []);
 
     if ((!text || !text.trim()) && attachments.length === 0) {
@@ -285,6 +315,10 @@ export const getExerciseSolutions = async (req, res) => {
   const { id: exerciseId } = req.params;
 
   try {
+    if (!isValidObjectId(exerciseId)) {
+      return res.status(400).json({ message: "Invalid exercise id" });
+    }
+
     const solutions = await Solution.find({ exercise: exerciseId })
       .populate("user", "name")
       .sort({ createdAt: -1 });
@@ -307,10 +341,17 @@ export const createExerciseSolution = async (req, res) => {
   const { text } = req.body;
 
   try {
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    if (!isValidObjectId(exerciseId)) {
+      return res.status(400).json({ message: "Invalid exercise id" });
+    }
+
     const attachments = mapAttachmentsFromFiles(req.files || []);
 
     if ((!text || !text.trim()) && attachments.length === 0) {
-      return res.status(400).json({ message: "Solution must have text or files" });
+      return res
+        .status(400)
+        .json({ message: "Solution must have text or files" });
     }
 
     const solution = await Solution.create({
@@ -329,6 +370,10 @@ export const createExerciseSolution = async (req, res) => {
   }
 };
 
+/* =========================
+   MY EXERCISES / SAVED
+   ========================= */
+
 /**
  * GET /api/exercises/mine (🔒)
  * Listar exercícios criados pelo user
@@ -336,6 +381,7 @@ export const createExerciseSolution = async (req, res) => {
 export const getMyExercises = async (req, res) => {
   try {
     const userId = getUserId(req);
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
     const my = await Exercise.find({ createdBy: userId })
       .populate("createdBy", "name email")
@@ -348,6 +394,7 @@ export const getMyExercises = async (req, res) => {
     });
   }
 };
+
 /**
  * GET /api/exercises/saved (🔒)
  * Listar exercícios guardados pelo user
@@ -355,6 +402,7 @@ export const getMyExercises = async (req, res) => {
 export const getMySavedExercises = async (req, res) => {
   try {
     const userId = getUserId(req);
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
     const saved = await SavedExercise.find({ user: userId })
       .populate({
@@ -363,28 +411,36 @@ export const getMySavedExercises = async (req, res) => {
       })
       .sort({ createdAt: -1 });
 
-    // devolve o array de SavedExercise (cada item tem .exercise)
     return res.json(saved);
   } catch (err) {
     console.error("GET MY SAVED EXERCISES ERROR:", err);
     return res.status(500).json({ message: "Erro ao buscar guardados" });
   }
 };
+
+/* =========================
+   UPDATE / DELETE
+   ========================= */
+
 /**
  * PUT /api/exercises/:id (🔒)
  * Editar exercício (só criador)
- * - pode atualizar title/description/subject/difficulty
- * - file é opcional (se vier, substitui o attachment)
+ * - file opcional (se vier, substitui attachments)
  */
 export const updateExercise = async (req, res) => {
   try {
     const userId = getUserId(req);
     const { id } = req.params;
 
-    const exercise = await Exercise.findById(id);
-    if (!exercise) return res.status(404).json({ message: "Exercise not found" });
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    if (!isValidObjectId(id)) {
+      return res.status(400).json({ message: "Invalid exercise id" });
+    }
 
-    // 🔒 só o criador pode editar
+    const exercise = await Exercise.findById(id);
+    if (!exercise)
+      return res.status(404).json({ message: "Exercise not found" });
+
     if (exercise.createdBy.toString() !== userId.toString()) {
       return res.status(403).json({ message: "Not allowed" });
     }
@@ -396,15 +452,13 @@ export const updateExercise = async (req, res) => {
     if (subject !== undefined) exercise.subject = subject;
     if (difficulty !== undefined) exercise.difficulty = difficulty;
 
-    // ✅ se vierem novos ficheiros, substitui attachments
     if (req.files && req.files.length > 0) {
       exercise.attachments = mapAttachmentsFromFiles(req.files);
     }
 
-
     await exercise.save();
+    await exercise.populate("createdBy", "name email");
 
-    // devolver também os counts (para manter UI consistente)
     const [savesCount, commentsCount, solutionsCount] = await Promise.all([
       SavedExercise.countDocuments({ exercise: exercise._id }),
       Comment.countDocuments({ exercise: exercise._id }),
@@ -426,29 +480,32 @@ export const updateExercise = async (req, res) => {
 /**
  * DELETE /api/exercises/:id (🔒)
  * Apagar exercício (só criador)
- * - apaga também saves/comments/solutions para não ficarem órfãos
+ * - apaga também saves/comments/solutions
  */
 export const deleteExercise = async (req, res) => {
   try {
     const userId = getUserId(req);
     const { id } = req.params;
 
-    const exercise = await Exercise.findById(id);
-    if (!exercise) return res.status(404).json({ message: "Exercise not found" });
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    if (!isValidObjectId(id)) {
+      return res.status(400).json({ message: "Invalid exercise id" });
+    }
 
-    //  só o criador pode apagar
+    const exercise = await Exercise.findById(id);
+    if (!exercise)
+      return res.status(404).json({ message: "Exercise not found" });
+
     if (exercise.createdBy.toString() !== userId.toString()) {
       return res.status(403).json({ message: "Not allowed" });
     }
 
-    //  limpar dependências
     await Promise.all([
       SavedExercise.deleteMany({ exercise: id }),
       Comment.deleteMany({ exercise: id }),
       Solution.deleteMany({ exercise: id }),
     ]);
 
-    // apagar o exercício
     await exercise.deleteOne();
 
     return res.json({ message: "Exercise deleted" });
@@ -457,8 +514,3 @@ export const deleteExercise = async (req, res) => {
     return res.status(500).json({ message: "Failed to delete exercise" });
   }
 };
-
-
-
-
-

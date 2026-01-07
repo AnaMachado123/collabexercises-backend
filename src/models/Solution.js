@@ -16,18 +16,22 @@ const solutionSchema = new mongoose.Schema(
 
     text: {
       type: String,
+      trim: true,      // ✅ evita texto só com espaços
       default: "",
     },
 
-    attachments: [
-      {
-        url: String,
-        publicId: String,
-        originalName: String,
-        mimetype: String,
-        size: Number,
-      },
-    ],
+    attachments: {
+      type: [
+        {
+          url: { type: String },
+          publicId: { type: String },
+          originalName: { type: String },
+          mimetype: { type: String },
+          size: { type: Number },
+        },
+      ],
+      default: [],     // ✅ nunca undefined
+    },
   },
   { timestamps: true }
 );

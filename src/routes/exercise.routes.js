@@ -5,35 +5,39 @@ import {
   createExercise,
   getExercises,
   getExerciseById,
-  getMyExercises, 
+  getMyExercises,
   getMySavedExercises,
   toggleSaveExercise,
   isExerciseSaved,
   getExerciseComments,
   createExerciseComment,
   getExerciseSolutions,
+  createExerciseSolution, // ✅ FALTAVA
   updateExercise,
-  createExerciseSolution,
   deleteExercise,
 } from "../controllers/exercise.controller.js";
 
-// 🔐 auth → named export
+// 🔐 auth
 import { protect } from "../middlewares/auth.middleware.js";
 
-// ☁️ upload → default export
+// ☁️ upload
 import uploadMiddleware from "../middlewares/upload.middleware.js";
 
 /* =========================
    EXERCISES
    ========================= */
+// ✅ files opcionais (não obriga a enviar)
 router.post("/", protect, uploadMiddleware.array("files", 10), createExercise);
+
 router.get("/", getExercises);
+
 router.get("/saved", protect, getMySavedExercises);
 router.get("/mine", protect, getMyExercises);
+
 router.put("/:id", protect, uploadMiddleware.array("files", 10), updateExercise);
 router.delete("/:id", protect, deleteExercise);
-router.get("/:id", getExerciseById);
 
+router.get("/:id", getExerciseById);
 
 /* =========================
    SAVES / BOOKMARKS
@@ -48,7 +52,7 @@ router.get("/:id/comments", getExerciseComments);
 router.post(
   "/:id/comments",
   protect,
-  uploadMiddleware.array("files"),
+  uploadMiddleware.array("files", 10),
   createExerciseComment
 );
 
@@ -59,7 +63,7 @@ router.get("/:id/solutions", getExerciseSolutions);
 router.post(
   "/:id/solutions",
   protect,
-  uploadMiddleware.array("files"),
+  uploadMiddleware.array("files", 10),
   createExerciseSolution
 );
 
