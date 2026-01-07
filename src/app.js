@@ -8,6 +8,7 @@ import exerciseRoutes from "./routes/exercise.routes.js";
 import uploadRoutes from "./routes/upload.routes.js";
 import savedRoutes from "./routes/saved.routes.js";
 import activityRoutes from "./routes/activity.routes.js";
+import solutionRoutes from "./routes/solution.routes.js";
 const app = express();
 
 // MIDDLEWARES
@@ -24,6 +25,7 @@ app.use("/api/exercises", exerciseRoutes);
 app.use("/api", uploadRoutes);
 app.use("/api/saved", savedRoutes);
 app.use("/api/activity", activityRoutes);
+app.use("/api/solutions", solutionRoutes);
 
 
 // ✅ rota de teste cloudinary
