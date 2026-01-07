@@ -10,6 +10,9 @@ const ActivitySchema = new mongoose.Schema(
     actor: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     exercise: { type: mongoose.Schema.Types.ObjectId, ref: "Exercise" },
     message: { type: String, required: true },
+    comment: { type: mongoose.Schema.Types.ObjectId, ref: "Comment" },
+    solution: { type: mongoose.Schema.Types.ObjectId, ref: "Solution" },
+
   },
   { timestamps: true }
 );

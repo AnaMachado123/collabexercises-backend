@@ -4,14 +4,20 @@ export const getRecentActivity = async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit || "20", 10), 50);
 
-    const items = await Activity.find()
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 30);
+
+    const items = await Activity.find({ createdAt: { $gte: cutoff } })
       .sort({ createdAt: -1 })
       .limit(limit)
-      .populate("actor", "name username email avatar") // ajusta campos do teu User
-      .populate("exercise", "title subject difficulty createdAt");
+      .populate("actor", "name email")
+      .populate("exercise", "title subject difficulty createdAt")
+      .populate("comment", "text createdAt")
+      .populate("solution", "text createdAt");
 
-    res.json(items);
+    return res.json(items);
   } catch (err) {
-    res.status(500).json({ message: "Failed to load activity", error: err.message });
+    console.error("GET ACTIVITY ERROR:", err);
+    return res.status(500).json({ message: "Failed to load activity" });
   }
 };

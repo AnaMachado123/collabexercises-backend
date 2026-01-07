@@ -67,7 +67,8 @@ export const createExercise = async (req, res) => {
       type: "exercise_created",
       actor: userId,
       exercise: exercise._id,
-      message: `criou um exercício`,
+      message: "created an exercise",
+
     });
 
     // 2️⃣ Emitir em tempo real (Socket.IO)
@@ -321,6 +322,25 @@ export const createExerciseComment = async (req, res) => {
     });
 
     await comment.populate("user", "name");
+    
+    // ✅ activity: comment
+    const activity = await Activity.create({
+      type: "comment_added",
+      actor: userId,
+      exercise: exerciseId,
+      comment: comment._id,
+      message: `commented on`,
+    });
+
+    const io = req.app.get("io");
+    if (io) {
+      const populatedActivity = await Activity.findById(activity._id)
+        .populate("actor", "name email")
+        .populate("exercise", "title subject difficulty createdAt");
+
+      io.emit("activity:new", populatedActivity);
+    }
+
 
     return res.status(201).json(comment);
   } catch (err) {
@@ -388,6 +408,25 @@ export const createExerciseSolution = async (req, res) => {
     });
 
     await solution.populate("user", "name");
+
+    // ✅ activity: solution
+    const activity = await Activity.create({
+      type: "solution_added",
+      actor: userId,
+      exercise: exerciseId,
+      solution: solution._id,
+      message: `posted a solution on`,
+    });
+
+    const io = req.app.get("io");
+    if (io) {
+      const populatedActivity = await Activity.findById(activity._id)
+        .populate("actor", "name email")
+        .populate("exercise", "title subject difficulty createdAt");
+
+      io.emit("activity:new", populatedActivity);
+    }
+
 
     return res.status(201).json(solution);
   } catch (err) {
