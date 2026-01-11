@@ -12,7 +12,13 @@ import solutionRoutes from "./routes/solution.routes.js";
 const app = express();
 
 // MIDDLEWARES
-app.use(cors());
+app.use(
+  cors({
+    origin: [process.env.CLIENT_URL, "http://localhost:5173"].filter(Boolean),
+    credentials: true,
+  })
+);
+
 
 // ⚠️ Importante: express.json só serve para JSON
 // Upload é multipart/form-data e vai pelo multer, então isto pode ficar.

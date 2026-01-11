@@ -1,31 +1,64 @@
-import "./src/config/env.js";
+// server.js
+import "./src/config/env.js"; // mantém o dotenv.config() se usas
 
 import mongoose from "mongoose";
 import http from "http";
+import cors from "cors";
 import { Server as SocketIOServer } from "socket.io";
 import app from "./src/app.js";
 
 const PORT = process.env.PORT || 3000;
 
+// opcional: health check (render gosta)
+app.get("/health", (req, res) => res.status(200).json({ ok: true }));
+
 async function startServer() {
   try {
+    // ======= Validar env vars =======
+    const required = ["MONGO_URI", "JWT_SECRET", "CLIENT_URL"];
+    const missing = required.filter((k) => !process.env[k]);
+
+    if (missing.length) {
+      console.error("❌ Missing env vars:", missing.join(", "));
+      process.exit(1);
+    }
+
+    // ======= Mongo =======
     mongoose.set("bufferCommands", false);
-
     await mongoose.connect(process.env.MONGO_URI);
-    console.log("MongoDB connected");
+    console.log("✅ MongoDB connected");
 
-    // ✅ cria server HTTP (em vez de app.listen direto)
+    // ======= CORS (API) =======
+    // Permite Vercel + localhost
+    const allowedOrigins = [
+      process.env.CLIENT_URL,
+      "http://localhost:5173",
+    ].filter(Boolean);
+
+    app.use(
+      cors({
+        origin: (origin, cb) => {
+          // permite requests sem origin (Postman/Render checks)
+          if (!origin) return cb(null, true);
+          if (allowedOrigins.includes(origin)) return cb(null, true);
+          return cb(new Error(`CORS blocked for origin: ${origin}`), false);
+        },
+        credentials: true,
+      })
+    );
+
+    // ======= HTTP Server =======
     const server = http.createServer(app);
 
-    // ✅ liga Socket.IO
+    // ======= Socket.IO =======
     const io = new SocketIOServer(server, {
       cors: {
-        origin: process.env.CLIENT_URL || "http://localhost:5173",
+        origin: allowedOrigins,
         credentials: true,
       },
     });
 
-    // ✅ deixa o io acessível nos controllers via req.app.get("io")
+    // disponibiliza io nos controllers: req.app.get("io")
     app.set("io", io);
 
     io.on("connection", (socket) => {
@@ -36,7 +69,7 @@ async function startServer() {
       });
     });
 
-    // error handler (mantém)
+    // ======= Error handler =======
     app.use((err, req, res, next) => {
       console.error("GLOBAL ERROR:", err);
 
@@ -45,12 +78,12 @@ async function startServer() {
       });
     });
 
-    // ✅ agora faz listen no server HTTP
+    // ======= Listen =======
     server.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
+      console.log(`🚀 Server running on port ${PORT}`);
     });
   } catch (err) {
-    console.error("MongoDB connection failed:", err);
+    console.error("❌ Server start failed:", err);
     process.exit(1);
   }
 }
