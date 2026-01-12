@@ -450,15 +450,37 @@ export const getMyExercises = async (req, res) => {
 
     const my = await Exercise.find({ createdBy: userId })
       .populate("createdBy", "name email")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
-    return res.json(my);
+    const myWithCounts = await Promise.all(
+      my.map(async (ex) => {
+        const [savesCount, commentsCount, solutionsCount] = await Promise.all([
+          SavedExercise.countDocuments({ exercise: ex._id }),
+          Comment.countDocuments({ exercise: ex._id }),
+          Solution.countDocuments({ exercise: ex._id }),
+        ]);
+
+        const filesCount = Array.isArray(ex.attachments) ? ex.attachments.length : 0;
+
+        return {
+          ...ex,
+          savesCount,
+          commentsCount,
+          solutionsCount,
+          filesCount,
+        };
+      })
+    );
+
+    return res.json(myWithCounts);
   } catch (e) {
     return res.status(500).json({
       message: e.message || "Failed to fetch my exercises",
     });
   }
 };
+
 
 /**
  * GET /api/exercises/saved (🔒)
@@ -474,14 +496,40 @@ export const getMySavedExercises = async (req, res) => {
         path: "exercise",
         populate: { path: "createdBy", select: "name email" },
       })
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
-    return res.json(saved);
+    const savedWithCounts = await Promise.all(
+      saved.map(async (row) => {
+        const ex = row.exercise;
+        if (!ex?._id) return row;
+
+        const [commentsCount, solutionsCount, savesCount] = await Promise.all([
+          Comment.countDocuments({ exercise: ex._id }),
+          Solution.countDocuments({ exercise: ex._id }),
+          SavedExercise.countDocuments({ exercise: ex._id }),
+        ]);
+
+        return {
+          ...row,
+          exercise: {
+            ...ex,
+            commentsCount,
+            solutionsCount,
+            savesCount,
+            filesCount: Array.isArray(ex.attachments) ? ex.attachments.length : 0,
+          },
+        };
+      })
+    );
+
+    return res.json(savedWithCounts);
   } catch (err) {
     console.error("GET MY SAVED EXERCISES ERROR:", err);
     return res.status(500).json({ message: "Erro ao buscar guardados" });
   }
 };
+
 
 /* =========================
    UPDATE / DELETE
