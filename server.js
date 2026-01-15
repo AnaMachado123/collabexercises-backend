@@ -3,14 +3,10 @@ import "./src/config/env.js"; // mantém o dotenv.config() se usas
 
 import mongoose from "mongoose";
 import http from "http";
-import cors from "cors";
 import { Server as SocketIOServer } from "socket.io";
 import app from "./src/app.js";
 
 const PORT = process.env.PORT || 3000;
-
-// opcional: health check (render gosta)
-app.get("/health", (req, res) => res.status(200).json({ ok: true }));
 
 async function startServer() {
   try {
@@ -28,24 +24,12 @@ async function startServer() {
     await mongoose.connect(process.env.MONGO_URI);
     console.log("✅ MongoDB connected");
 
-    // ======= CORS (API) =======
-    // Permite Vercel + localhost
+    // ======= Allowed origins =======
+    // usado para Socket.IO (no Express já está no app.js)
     const allowedOrigins = [
       process.env.CLIENT_URL,
       "http://localhost:5173",
     ].filter(Boolean);
-
-    app.use(
-      cors({
-        origin: (origin, cb) => {
-          // permite requests sem origin (Postman/Render checks)
-          if (!origin) return cb(null, true);
-          if (allowedOrigins.includes(origin)) return cb(null, true);
-          return cb(new Error(`CORS blocked for origin: ${origin}`), false);
-        },
-        credentials: true,
-      })
-    );
 
     // ======= HTTP Server =======
     const server = http.createServer(app);
@@ -69,13 +53,10 @@ async function startServer() {
       });
     });
 
-    // ======= Error handler =======
-    app.use((err, req, res, next) => {
-      console.error("GLOBAL ERROR:", err);
-
-      res.status(err.status || 500).json({
-        message: err.message || "Internal server error",
-      });
+    // ======= Health check =======
+    // (Render gosta disto)
+    server.on("request", (req, res) => {
+      // nothing: app handles routes
     });
 
     // ======= Listen =======
